@@ -13,7 +13,7 @@ Dependencies ensure each stage runs only after its prerequisites succeed.
 
 ## Cancel decision
 
-Cancel is terminal for the selected task until an explicit retry.
+Cancel is terminal for the selected task until an retry.
 
 If `A -> B -> C` and A is cancelled:
 
