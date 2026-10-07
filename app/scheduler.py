@@ -412,9 +412,7 @@ class TaskScheduler:
         self.wakeup_event = asyncio.Event()
         self.scheduler_task = None
 
-    # ============================================================
-    # START / STOP
-    # ============================================================
+   
 
     async def start(self):
         if self.scheduler_task is not None:
@@ -442,9 +440,7 @@ class TaskScheduler:
     def notify(self):
         self.wakeup_event.set()
 
-    # ============================================================
-    # RESTART RECOVERY
-    # ============================================================
+ 
 
     def _recover_after_restart(self):
         with SessionLocal() as db:
@@ -455,17 +451,13 @@ class TaskScheduler:
             ).all()
 
             for task in running:
-                # Preserve progress.
-                # A sudden kill can lose at most the last
-                # progress interval that had not yet been persisted.
+            
                 task.status = TaskStatus.WAITING.value
                 task.updated_at = utcnow()
 
             db.commit()
 
-    # ============================================================
-    # MAIN SCHEDULER LOOP
-    # ============================================================
+ 
 
     async def _scheduler_loop(self):
         while True:
@@ -489,10 +481,7 @@ class TaskScheduler:
                 print(f"Scheduler error: {exc}")
                 await asyncio.sleep(1)
 
-    # ============================================================
-    # SCHEDULE TASKS
-    # ============================================================
-
+   
     async def _schedule_ready_tasks(self):
         with SessionLocal() as db:
             tasks = db.scalars(
@@ -505,18 +494,13 @@ class TaskScheduler:
 
         for task in tasks:
 
-            # Respect concurrency limit.
+           
             if len(self.running_tasks) >= self.concurrency_limit:
                 break
 
-            # Already running in memory.
             if task.id in self.running_tasks:
                 continue
 
-            # ----------------------------------------------------
-            # If dependency has permanently failed or is blocked,
-            # this task can never execute.
-            # ----------------------------------------------------
 
             if self._dependencies_blocked(task.id):
                 with SessionLocal() as db:
@@ -536,16 +520,10 @@ class TaskScheduler:
 
                 continue
 
-            # ----------------------------------------------------
-            # Start task only when ALL dependencies succeeded.
-            # ----------------------------------------------------
+         
 
             if self._dependencies_succeeded(task.id):
                 await self._start_task(task.id)
-
-    # ============================================================
-    # DEPENDENCY CHECKS
-    # ============================================================
 
     def _dependencies_succeeded(self, task_id):
         with SessionLocal() as db:
@@ -583,10 +561,6 @@ class TaskScheduler:
                 for dependency in task.dependencies
             )
 
-    # ============================================================
-    # START TASK
-    # ============================================================
-
     async def _start_task(self, task_id):
         cancel_event = asyncio.Event()
         pause_event = asyncio.Event()
@@ -614,10 +588,6 @@ class TaskScheduler:
         self.pause_events.pop(task_id, None)
 
         self.notify()
-
-    # ============================================================
-    # EXECUTE TASK
-    # ============================================================
 
     async def _execute_task(
         self,
@@ -652,17 +622,11 @@ class TaskScheduler:
 
             while remaining > 0:
 
-                # ------------------------------------------------
-                # CANCEL CHECK
-                # ------------------------------------------------
-
+             
                 if cancel_event.is_set():
                     await self._handle_cancelled_task(task_id)
                     return
 
-                # ------------------------------------------------
-                # PAUSE CHECK
-                # ------------------------------------------------
 
                 if pause_event.is_set():
                     await self._handle_paused_task(task_id)
@@ -683,31 +647,22 @@ class TaskScheduler:
                     elapsed,
                 )
 
-            # ----------------------------------------------------
-            # FINAL CANCEL CHECK
-            # ----------------------------------------------------
+       
 
             if cancel_event.is_set():
                 await self._handle_cancelled_task(task_id)
                 return
 
-            # ----------------------------------------------------
-            # FINAL PAUSE CHECK
-            # ----------------------------------------------------
+        
 
             if pause_event.is_set():
                 await self._handle_paused_task(task_id)
                 return
 
-            # ----------------------------------------------------
-            # FINISH TASK
-            # ----------------------------------------------------
+          
 
             await self._finish_task(task_id)
 
-    # ============================================================
-    # SAVE PROGRESS
-    # ============================================================
 
     async def _save_progress(self, task_id, elapsed):
         with SessionLocal() as db:
@@ -728,9 +683,7 @@ class TaskScheduler:
 
             db.commit()
 
-    # ============================================================
-    # FINISH TASK
-    # ============================================================
+  
 
     async def _finish_task(self, task_id):
         with SessionLocal() as db:
@@ -742,17 +695,13 @@ class TaskScheduler:
             ):
                 return
 
-            # ----------------------------------------------------
-            # RANDOM FAILURE
-            # ----------------------------------------------------
+            
 
             if random.random() < task.failure_rate:
 
                 task.attempts += 1
 
-                # ------------------------------------------------
-                # AUTOMATIC RETRY AVAILABLE
-                # ------------------------------------------------
+               
 
                 if task.attempts <= task.max_retries:
 
@@ -762,10 +711,7 @@ class TaskScheduler:
 
                     db.commit()
 
-                    # Exponential backoff:
-                    # attempt 1 -> 1 second
-                    # attempt 2 -> 2 seconds
-                    # attempt 3 -> 4 seconds
+                  
 
                     delay = 2 ** (task.attempts - 1)
 
@@ -775,10 +721,7 @@ class TaskScheduler:
 
                     return
 
-                # ------------------------------------------------
-                # NO AUTOMATIC RETRIES LEFT
-                # ------------------------------------------------
-
+             
                 task.status = TaskStatus.FAILED.value
 
                 task.elapsed_seconds = task.duration_seconds
@@ -794,9 +737,7 @@ class TaskScheduler:
 
                 return
 
-            # ----------------------------------------------------
-            # SUCCESS
-            # ----------------------------------------------------
+           
 
             task.status = TaskStatus.SUCCEEDED.value
 
@@ -805,9 +746,7 @@ class TaskScheduler:
 
             db.commit()
 
-    # ============================================================
-    # CANCEL TASK
-    # ============================================================
+
 
     async def cancel_task(self, task_id):
         with SessionLocal() as db:
@@ -816,7 +755,7 @@ class TaskScheduler:
             if task is None:
                 return False
 
-            # Terminal states cannot be cancelled.
+            
             if task.status in (
                 TaskStatus.SUCCEEDED.value,
                 TaskStatus.FAILED.value,
@@ -825,9 +764,6 @@ class TaskScheduler:
             ):
                 return False
 
-            # Persist cancellation immediately.
-            # The running coroutine sees the event and exits
-            # without completing the task.
 
             running_event = self.cancel_events.get(task_id)
 
@@ -845,10 +781,7 @@ class TaskScheduler:
 
         return True
 
-    # ============================================================
-    # RETRY TASK
-    # ============================================================
-
+  
     async def retry_task(self, task_id):
         with SessionLocal() as db:
             task = db.get(Task, task_id)
@@ -856,12 +789,7 @@ class TaskScheduler:
             if task is None:
                 return False, "Task not found"
 
-            # ----------------------------------------------------
-            # MANUAL RETRY
-            #
-            # A task can now be manually retried when it is:
-            # FAILED or CANCELLED
-            # ----------------------------------------------------
+           
 
             if task.status not in (
                 TaskStatus.FAILED.value,
@@ -875,7 +803,7 @@ class TaskScheduler:
                     ),
                 )
 
-            # Every dependency must already be successful.
+            
             for dependency in task.dependencies:
 
                 if (
@@ -892,7 +820,6 @@ class TaskScheduler:
                         ),
                     )
 
-            # Reset the task and all descendants.
             branch = [
                 task
             ] + self._get_descendants(
@@ -912,10 +839,7 @@ class TaskScheduler:
 
         return True, None
 
-    # ============================================================
-    # PAUSE TASK
-    # ============================================================
-
+  
     async def pause_task(self, task_id):
         with SessionLocal() as db:
             task = db.get(Task, task_id)
@@ -934,8 +858,6 @@ class TaskScheduler:
             if pause_event is not None:
                 pause_event.set()
 
-            # Descendants are held immediately.
-            # Running descendants, if any, are also signalled.
 
             descendants = self._get_descendants(
                 db,
@@ -971,10 +893,7 @@ class TaskScheduler:
 
         return True
 
-    # ============================================================
-    # RESUME TASK
-    # ============================================================
-
+  
     async def resume_task(self, task_id):
         with SessionLocal() as db:
             task = db.get(Task, task_id)
@@ -988,8 +907,7 @@ class TaskScheduler:
                     f"Task '{task.name}' is not PAUSED",
                 )
 
-            # A paused task can resume only when all dependencies
-            # have succeeded.
+          
 
             if any(
                 dependency.status
@@ -1024,15 +942,9 @@ class TaskScheduler:
 
         return True, None
 
-    # ============================================================
-    # HANDLE CANCELLED TASK
-    # ============================================================
 
     async def _handle_cancelled_task(self, task_id):
-        # The API persists CANCELLED before the coroutine exits.
-        # Never re-cancel a task after an explicit retry has
-        # already moved it back to WAITING.
-        # The old coroutine must simply terminate.
+       
 
         with SessionLocal() as db:
             task = db.get(Task, task_id)
@@ -1045,9 +957,6 @@ class TaskScheduler:
 
         self.notify()
 
-    # ============================================================
-    # HANDLE PAUSED TASK
-    # ============================================================
 
     async def _handle_paused_task(self, task_id):
         with SessionLocal() as db:
@@ -1076,9 +985,7 @@ class TaskScheduler:
 
         self.notify()
 
-    # ============================================================
-    # GET ALL DESCENDANTS
-    # ============================================================
+   
 
     def _get_descendants(self, db, root_id):
         all_tasks = db.scalars(
@@ -1109,10 +1016,7 @@ class TaskScheduler:
 
         return descendants
 
-    # ============================================================
-    # CANCEL BRANCH
-    # ============================================================
-
+   
     def _cancel_branch(self, db, root_id):
         root = db.get(
             Task,
@@ -1133,7 +1037,7 @@ class TaskScheduler:
 
             task.status = TaskStatus.CANCELLED.value
 
-            # Cancel deliberately discards runtime progress.
+            
             task.elapsed_seconds = 0.0
             task.attempts = 0
             task.updated_at = utcnow()
@@ -1145,10 +1049,7 @@ class TaskScheduler:
             if event is not None:
                 event.set()
 
-    # ============================================================
-    # BLOCK DOWNSTREAM TASKS
-    # ============================================================
-
+    
     def _block_downstream(self, db, root_id):
         for task in self._get_descendants(
             db,
