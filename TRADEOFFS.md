@@ -10,7 +10,7 @@ FIFO is deterministic and easy to explain, but can create head-of-line blocking 
 
 ## 3. Cancel as terminal instead of reset-to-waiting
 
-Resetting cancellation to `WAITING` made the old implementation immediately rerun cancelled work. Terminal `CANCELLED` state is less surprising and makes retry an explicit operator action.
+Reseting cancellation to `WAITING` made the old implementation immediately rerun cancelled work. Terminal `CANCELLED` state is less surprising and makes retry an explicit operator action.
 
 ## 4. Periodic progress persistence
 
