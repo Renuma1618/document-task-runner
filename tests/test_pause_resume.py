@@ -32,7 +32,7 @@ def test_pause_preserves_progress_and_resume_continues(client):
     client.post("/tasks/Upload%20Document/pause")
     paused = wait_for_status(client, "Upload%20Document", "PAUSED")
 
-    # The scheduler stores progress; it must not be reset by pause.
+  
     assert paused["elapsed_seconds"] > 0
     assert paused["remaining_seconds"] < 0.5
 

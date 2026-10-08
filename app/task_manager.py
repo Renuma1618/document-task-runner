@@ -64,7 +64,6 @@ def create_tasks(task_inputs):
         created = []
         name_to_task = {}
 
-        # No commit occurs until every validation above has passed.
         for item in task_inputs:
             task = Task(
                 name=item.name,
